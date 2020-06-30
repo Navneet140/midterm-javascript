@@ -1,67 +1,58 @@
-const Reservation = require('../models/reservation');
-const User = require('../models/user');
+// You need to complete this controller with the required 7 actions
 const viewPath = 'reservations';
+const Reservation = require('../models/reservation');
 const restaurants = Reservation.schema.paths.restaurant.enumValues;
+const User = require('../models/user');
 
+
+// #1
 exports.index = async (req, res) => {
   try {
-    const user = await User.findOne({email: req.session.passport.user});
-    const reservations = await Reservation.find({user: user._id})
-      .populate('user');
+    const reservations = await Reservation
+      .find()
+      .populate('user')
+      .sort({updatedAt: 'desc'});
 
     res.render(`${viewPath}/index`, {
-      pageTitle: 'Your Reservations',
-      reservations
+      pageTitle: 'User Reservations',
+      reservations: reservations
     });
   } catch (error) {
-    req.flash('danger', 'There was an issue finding your reservations.');
+    req.flash('danger', `There was an error displaying the Collection: ${error}`);
     res.redirect('/');
   }
 };
 
+// #2
 exports.show = async (req, res) => {
   try {
     const reservation = await Reservation.findById(req.params.id)
       .populate('user');
-
+    console.log(reservation);
     res.render(`${viewPath}/show`, {
-      pageTitle: 'Reservation',
-      reservation
+      pageTitle: reservation.restaurant,
+      reservation: reservation
     });
   } catch (error) {
-    req.flash('danger', 'There was an issue with finding this reservation.');
+    req.flash('danger', `Something Went Wrong while displaying this Reservation: ${error}`);
     res.redirect('/');
   }
 };
 
-exports.new = async (req, res) => {
+// #3
+exports.new = (req, res) => {
   res.render(`${viewPath}/new`, {
     pageTitle: 'New Reservation',
-    restaurants
+    restaurants: restaurants
   });
 };
 
-exports.edit = async (req, res) => {
-  try {
-    const reservation = await Reservation.findById(req.params.id);
-    
-    res.render(`${viewPath}/edit`, {
-      pageTitle: 'Reservation',
-      restaurants,
-      formData: reservation
-    });
-  } catch (error) {
-    req.flash('danger', 'There was an issue with finding this reservation.');
-    res.redirect('/');
-  }
-};
-
+// #4
 exports.create = async (req, res) => {
   try {
     const user = await User.findOne({email: req.session.passport.user});
     const attributes = {user: user._id, ...req.body};
     const reservation = await Reservation.create(attributes);
-
     req.flash('success', 'Your reservation was created successfully.');
     res.redirect(`/${viewPath}/${reservation.id}`);
   } catch (error) {
@@ -71,32 +62,55 @@ exports.create = async (req, res) => {
   }
 };
 
-exports.update = async (req, res) => {
+
+// #5
+exports.edit = async (req, res) => {
   try {
-    const user = await User.findOne({email: req.session.passport.user});
-    const reservation = await Reservation.findById(req.body.id);
-    if (!reservation) throw new Error('Reservation could not be found');
-
-    const attributes = {user: user._id, ...req.body};
-    await Reservation.validate(attributes);
-    await Reservation.updateOne({_id: req.body.id}, req.body);
-
-    req.flash('success', 'This reservation was updated successfully');
-    res.redirect(`/${viewPath}/${reservation.id}`);
+    const reservation = await Reservation.findById(req.params.id);
+    res.render(`${viewPath}/edit`, {
+      pageTitle: reservation.restaurant,
+      restaurants: restaurants,
+      formData: reservation
+      
+    });
   } catch (error) {
-    req.flash('danger', 'There was an issue with updating this reservation.');
-    res.redirect(`/${viewPath}`);
+    req.flash('danger', `There was an error getting the reservation: ${error}`);
+    res.redirect('/');
   }
 };
 
+
+// #6
+exports.update = async (req, res) => {
+  try {
+    const { user: email } = req.session.passport;
+    const user = await User.findOne({email: email});
+
+    let reservation = await Reservation.findById(req.body.id);
+    if (!reservation) throw new Error('Could not be found');
+
+    const attributes = {user: user._id, ...req.body};
+    await Reservation.validate(attributes);
+    await Reservation.findByIdAndUpdate(attributes.id, attributes);
+
+    req.flash('success', 'Reservation updated successfully! Enjoy your day');
+    res.redirect(`/reservations/${req.body.id}`);
+  } catch (error) {
+    req.flash('danger', `Something went wrong: ${error}`);
+    res.redirect(`/reservations/${req.body.id}/edit`);
+  }
+};
+
+
+// #7
 exports.delete = async (req, res) => {
   try {
+    console.log(req.body);
     await Reservation.deleteOne({_id: req.body.id});
-
-    req.flash('success', 'The reservation was delete successfully.');
-    res.redirect(`/${viewPath}`);
+    req.flash('success', 'The Reservation has been cancelled');
+    res.redirect(`/reservations`);
   } catch (error) {
-    req.flash('danger', 'There was an issue with deleting this reservation.');
-    res.redirect(`/${viewPath}`);
+    req.flash('danger', `Something went wrong: ${error}`);
+    res.redirect(`/reservations`);
   }
 };
